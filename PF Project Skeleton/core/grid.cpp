@@ -1,62 +1,121 @@
 #include "grid.h"
 #include "simulation_state.h"
+#include <iostream>
+#include <cstdlib>
+
+#ifdef _WIN32
+    #include <windows.h>
+#else
+    #include <unistd.h>
+#endif
 
 // ============================================================================
-// GRID.CPP - Grid utilities
+// GRID.CPP - Grid utilities with smooth animation
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// Check if a position is inside the grid.
-// ----------------------------------------------------------------------------
-// Returns true if x,y are within bounds.
-// ----------------------------------------------------------------------------
-bool isInBounds() {
+bool isInBounds(int x, int y) {
+    return x >= 0 && x < gridRows && y >= 0 && y < gridCols;
 }
 
-// ----------------------------------------------------------------------------
-// Check if a tile is a track tile.
-// ----------------------------------------------------------------------------
-// Returns true if the tile can be traversed by trains.
-// ----------------------------------------------------------------------------
-bool isTrackTile() {
+bool isTrackTile(int x, int y) {
+    if (!isInBounds(x, y)) return false;
+    
+    char tile = grid[x][y];
+    return (tile == '-' || tile == '|' || tile == '=' || tile == '\\' || tile == '/' || 
+            tile == '+' || tile == 'S' || tile == 'D' ||
+            (tile >= 'A' && tile <= 'Z'));
 }
 
-// ----------------------------------------------------------------------------
-// Check if a tile is a switch.
-// ----------------------------------------------------------------------------
-// Returns true if the tile is 'A'..'Z'.
-// ----------------------------------------------------------------------------
-bool isSwitchTile() {
+bool isSwitchTile(int x, int y) {
+    if (!isInBounds(x, y)) return false;
+    
+    char tile = grid[x][y];
+    return (tile >= 'A' && tile <= 'Z' && tile != 'S' && tile != 'D');
 }
 
-// ----------------------------------------------------------------------------
-// Get switch index from character.
-// ----------------------------------------------------------------------------
-// Maps 'A'..'Z' to 0..25, else -1.
-// ----------------------------------------------------------------------------
-int getSwitchIndex() {
+int getSwitchIndex(char switchChar) {
+    if (switchChar >= 'A' && switchChar <= 'Z') {
+        return switchChar - 'A';
+    }
+    return -1;
 }
 
-// ----------------------------------------------------------------------------
-// Check if a position is a spawn point.
-// ----------------------------------------------------------------------------
-// Returns true if x,y is a spawn.
-// ----------------------------------------------------------------------------
-bool isSpawnPoint() {
+bool isSpawnPoint(int x, int y) {
+    if (!isInBounds(x, y)) return false;
+    return grid[x][y] == 'S';
 }
 
-// ----------------------------------------------------------------------------
-// Check if a position is a destination.
-// ----------------------------------------------------------------------------
-// Returns true if x,y is a destination.
-// ----------------------------------------------------------------------------
-bool isDestinationPoint() {
+bool isDestinationPoint(int x, int y) {
+    if (!isInBounds(x, y)) return false;
+    return grid[x][y] == 'D';
 }
 
-// ----------------------------------------------------------------------------
-// Toggle a safety tile.
-// ----------------------------------------------------------------------------
-// Returns true if toggled successfully.
-// ----------------------------------------------------------------------------
-bool toggleSafetyTile() {
+bool toggleSafetyTile(int x, int y) {
+    if (!isInBounds(x, y)) return false;
+    if (!isTrackTile(x, y)) return false;
+    safetyTiles[x][y] = !safetyTiles[x][y];
+    return true;
+}
+
+void printGrid() {
+    // Clear screen for smooth animation
+#ifdef _WIN32
+    system("cls");
+#else
+    system("clear");
+#endif
+    
+    std::cout << "\n=== RAILWAY SIMULATION ===\n";
+    std::cout << "Tick: " << currentTick << " | Delivered: " << trainsDelivered 
+              << " | Crashed: " << trainsCrashed << "\n\n";
+    
+    // Print the railway map with trains
+    for (int row = 0; row < gridRows; row++) {
+        for (int col = 0; col < gridCols; col++) {
+            char tile = grid[row][col];
+            
+            // Check if there's a train here
+            bool hasActiveTrain = false;
+            for (int i = 0; i < numTrains; i++) {
+                if (trains[i].state == TRAIN_ACTIVE && trains[i].x == row && trains[i].y == col) {
+                    // Show train with arrows
+                    switch (trains[i].direction) {
+                        case DIR_UP:    std::cout << "^"; break;
+                        case DIR_DOWN:  std::cout << "v"; break;
+                        case DIR_LEFT:  std::cout << "<"; break;
+                        case DIR_RIGHT: std::cout << ">"; break;
+                        default:        std::cout << trains[i].id; break;
+                    }
+                    hasActiveTrain = true;
+                    break;
+                }
+            }
+            
+            // If no train, show the track
+            if (!hasActiveTrain) {
+                std::cout << tile;
+            }
+        }
+        std::cout << std::endl;
+    }
+    
+    // Show active trains
+    std::cout << "\nActive Trains: ";
+    bool hasActive = false;
+    for (int i = 0; i < numTrains; i++) {
+        if (trains[i].state == TRAIN_ACTIVE) {
+            if (hasActive) std::cout << ", ";
+            std::cout << "T" << trains[i].id << "(" << trains[i].x << "," << trains[i].y << ")";
+            hasActive = true;
+        }
+    }
+    if (!hasActive) std::cout << "None";
+    std::cout << std::endl;
+    
+    // Small delay for animation
+#ifdef _WIN32
+    Sleep(800);
+#else
+    usleep(800000);
+#endif
 }
