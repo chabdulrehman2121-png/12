@@ -1,6 +1,8 @@
 #ifndef IO_H
 #define IO_H
 
+#include <string>
+
 // ============================================================================
 // IO.H - Level I/O and logging
 // ============================================================================
@@ -9,7 +11,7 @@
 // LEVEL LOADING
 // ----------------------------------------------------------------------------
 // Load a .lvl file.
-bool loadLevelFile();
+bool loadLevelFile(const std::string& filename);
 
 // ----------------------------------------------------------------------------
 // LOGGING
@@ -18,13 +20,13 @@ bool loadLevelFile();
 void initializeLogFiles();
 
 // Append train movement to trace.csv.
-void logTrainTrace();
+void logTrainTrace(int trainID, int x, int y, int direction, const std::string& state);
 
 // Append switch state to switches.csv.
-void logSwitchState();
+void logSwitchState(int switchIndex);
 
 // Append signal state to signals.csv.
-void logSignalState();
+void logSignalState(int switchIndex, const std::string& color);
 
 // Write final metrics to metrics.txt.
 void writeMetrics();
