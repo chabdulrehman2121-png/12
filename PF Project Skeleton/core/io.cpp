@@ -2,9 +2,12 @@
 #include "simulation_state.h"
 #include "grid.h"
 #include <fstream>
+#include <iostream>
+#include <sstream>
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <algorithm>
 
 // ============================================================================
 // IO.CPP - Level I/O and logging
@@ -15,7 +18,135 @@
 // ----------------------------------------------------------------------------
 // Load a .lvl file into global state.
 // ----------------------------------------------------------------------------
-bool loadLevelFile() {
+bool loadLevelFile(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open level file: " << filename << std::endl;
+        return false;
+    }
+    
+    std::string line;
+    std::string section = "";
+    int mapRowIndex = 0;
+    
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        
+        if (line.find("NAME:") == 0) {
+            section = "NAME";
+            continue;
+        } else if (line.find("ROWS:") == 0) {
+            section = "ROWS";
+            continue;
+        } else if (line.find("COLS:") == 0) {
+            section = "COLS";
+            continue;
+        } else if (line.find("SEED:") == 0) {
+            section = "SEED";
+            continue;
+        } else if (line.find("WEATHER:") == 0) {
+            section = "WEATHER";
+            continue;
+        } else if (line.find("MAP:") == 0) {
+            section = "MAP";
+            mapRowIndex = 0;
+            continue;
+        } else if (line.find("SWITCHES:") == 0) {
+            section = "SWITCHES";
+            continue;
+        } else if (line.find("TRAINS:") == 0) {
+            section = "TRAINS";
+            continue;
+        }
+        
+        // Process content based on current section
+        if (section == "NAME") {
+            levelName = line;
+        } else if (section == "ROWS") {
+            gridRows = std::stoi(line);
+        } else if (section == "COLS") {
+            gridCols = std::stoi(line);
+        } else if (section == "SEED") {
+            seed = std::stoi(line);
+        } else if (section == "WEATHER") {
+            if (line == "NORMAL") weather = WEATHER_NORMAL;
+            else if (line == "RAIN") weather = WEATHER_RAIN;
+            else if (line == "FOG") weather = WEATHER_FOG;
+        } else if (section == "MAP") {
+            if (mapRowIndex < gridRows) {
+                for (int col = 0; col < std::min((int)line.length(), gridCols); col++) {
+                    grid[mapRowIndex][col] = line[col];
+                    
+                    // Record spawn and destination points
+                    if (line[col] == 'S' && numSpawnPoints < 10) {
+                        spawnPoints[numSpawnPoints].x = mapRowIndex;
+                        spawnPoints[numSpawnPoints].y = col;
+                        spawnPoints[numSpawnPoints].active = true;
+                        numSpawnPoints++;
+                    } else if (line[col] == 'D' && numDestinationPoints < 10) {
+                        destinationPoints[numDestinationPoints].x = mapRowIndex;
+                        destinationPoints[numDestinationPoints].y = col;
+                        destinationPoints[numDestinationPoints].active = true;
+                        numDestinationPoints++;
+                    } else if (line[col] >= 'A' && line[col] <= 'Z' && line[col] != 'S' && line[col] != 'D') {
+                        // Record switch positions
+                        int switchIndex = line[col] - 'A';
+                        switches[switchIndex].x = mapRowIndex;
+                        switches[switchIndex].y = col;
+                        switches[switchIndex].letter = line[col];
+                    }
+                }
+                mapRowIndex++;
+            }
+        } else if (section == "SWITCHES") {
+            std::istringstream iss(line);
+            char letter;
+            std::string modeStr;
+            int initState, k0, k1, k2, k3;
+            std::string state0, state1;
+            
+            iss >> letter >> modeStr >> initState >> k0 >> k1 >> k2 >> k3 >> state0 >> state1;
+            
+            int switchIndex = letter - 'A';
+            switches[switchIndex].letter = letter;
+            switches[switchIndex].mode = (modeStr == "PER_DIR") ? PER_DIR : GLOBAL;
+            switches[switchIndex].initState = initState;
+            switches[switchIndex].currentState = initState;
+            switches[switchIndex].kValues[0] = k0; // UP
+            switches[switchIndex].kValues[1] = k1; // RIGHT
+            switches[switchIndex].kValues[2] = k2; // DOWN
+            switches[switchIndex].kValues[3] = k3; // LEFT
+            switches[switchIndex].states[0] = state0;
+            switches[switchIndex].states[1] = state1;
+            
+            numSwitches = std::max(numSwitches, switchIndex + 1);
+        } else if (section == "TRAINS") {
+            std::istringstream iss(line);
+            int spawnTick, x, y, direction, colorIndex;
+            iss >> spawnTick >> x >> y >> direction >> colorIndex;
+            
+            trains[numTrains].id = numTrains;
+            trains[numTrains].spawnTick = spawnTick;
+            trains[numTrains].x = x;
+            trains[numTrains].y = y;
+            trains[numTrains].direction = direction;
+            trains[numTrains].colorIndex = colorIndex;
+            trains[numTrains].state = TRAIN_SCHEDULED;
+            trains[numTrains].waitTicks = 0;
+            
+            // Set destination to first available destination point for now
+            if (numDestinationPoints > 0) {
+                int destIndex = colorIndex % numDestinationPoints;
+                trains[numTrains].destinationX = destinationPoints[destIndex].x;
+                trains[numTrains].destinationY = destinationPoints[destIndex].y;
+            }
+            
+            numTrains++;
+        }
+    }
+    
+    file.close();
+    return true;
 }
 
 // ----------------------------------------------------------------------------
@@ -24,6 +155,19 @@ bool loadLevelFile() {
 // Create/clear CSV logs with headers.
 // ----------------------------------------------------------------------------
 void initializeLogFiles() {
+    system("mkdir -p out");
+    
+    std::ofstream trace("out/trace.csv");
+    trace << "Tick,TrainID,X,Y,Direction,State\n";
+    trace.close();
+    
+    std::ofstream switches_log("out/switches.csv");
+    switches_log << "Tick,Switch,Mode,State\n";
+    switches_log.close();
+    
+    std::ofstream signals_log("out/signals.csv");
+    signals_log << "Tick,Switch,Signal\n";
+    signals_log.close();
 }
 
 // ----------------------------------------------------------------------------
@@ -31,7 +175,10 @@ void initializeLogFiles() {
 // ----------------------------------------------------------------------------
 // Append tick, train id, position, direction, state to trace.csv.
 // ----------------------------------------------------------------------------
-void logTrainTrace() {
+void logTrainTrace(int trainID, int x, int y, int direction, const std::string& state) {
+    std::ofstream trace("out/trace.csv", std::ios::app);
+    trace << currentTick << "," << trainID << "," << x << "," << y << "," << direction << "," << state << "\n";
+    trace.close();
 }
 
 // ----------------------------------------------------------------------------
@@ -39,7 +186,12 @@ void logTrainTrace() {
 // ----------------------------------------------------------------------------
 // Append tick, switch id/mode/state to switches.csv.
 // ----------------------------------------------------------------------------
-void logSwitchState() {
+void logSwitchState(int switchIndex) {
+    std::ofstream switches_log("out/switches.csv", std::ios::app);
+    switches_log << currentTick << "," << switches[switchIndex].letter << "," 
+                 << (switches[switchIndex].mode == PER_DIR ? "PER_DIR" : "GLOBAL") << ","
+                 << switches[switchIndex].states[switches[switchIndex].currentState] << "\n";
+    switches_log.close();
 }
 
 // ----------------------------------------------------------------------------
@@ -47,7 +199,10 @@ void logSwitchState() {
 // ----------------------------------------------------------------------------
 // Append tick, switch id, signal color to signals.csv.
 // ----------------------------------------------------------------------------
-void logSignalState() {
+void logSignalState(int switchIndex, const std::string& color) {
+    std::ofstream signals_log("out/signals.csv", std::ios::app);
+    signals_log << currentTick << "," << switches[switchIndex].letter << "," << color << "\n";
+    signals_log.close();
 }
 
 // ----------------------------------------------------------------------------
@@ -56,4 +211,21 @@ void logSignalState() {
 // Write summary metrics to metrics.txt.
 // ----------------------------------------------------------------------------
 void writeMetrics() {
+    std::ofstream metrics("out/metrics.txt");
+    
+    metrics << "=== SIMULATION METRICS ===\n";
+    metrics << "Level: " << levelName << "\n";
+    metrics << "Total Ticks: " << currentTick << "\n";
+    metrics << "Trains Delivered: " << trainsDelivered << "/" << numTrains << "\n";
+    metrics << "Trains Crashed: " << trainsCrashed << "\n";
+    metrics << "Switch Flips: " << switchFlips << "\n";
+    metrics << "Total Wait Ticks: " << totalWaitTicks << "\n";
+    
+    double efficiency = (numTrains > 0) ? (double)trainsDelivered / numTrains * 100.0 : 0.0;
+    metrics << "Delivery Efficiency: " << efficiency << "%\n";
+    
+    double avgWait = (trainsDelivered > 0) ? (double)totalWaitTicks / trainsDelivered : 0.0;
+    metrics << "Average Wait Time: " << avgWait << " ticks\n";
+    
+    metrics.close();
 }
