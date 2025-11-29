@@ -15,22 +15,23 @@ int gridRows = 0, gridCols = 0;
 // ----------------------------------------------------------------------------
 // TRAINS
 // ----------------------------------------------------------------------------
-Train trains[MAX_TRAINS];
+int trains[MAX_TRAINS][TRAIN_FIELDS];
 int numTrains = 0;
 int activeTrains = 0;
 
 // ----------------------------------------------------------------------------
 // SWITCHES
 // ----------------------------------------------------------------------------
-Switch switches[MAX_SWITCHES];
+int switches[MAX_SWITCHES][SWITCH_FIELDS];
+std::string switchStateNames[MAX_SWITCHES][2];
 int numSwitches = 0;
 
 // ----------------------------------------------------------------------------
 // SPAWN AND DESTINATION POINTS
 // ----------------------------------------------------------------------------
-SpawnPoint spawnPoints[10];
+int spawnPoints[10][SPAWN_FIELDS];
 int numSpawnPoints = 0;
-DestinationPoint destinationPoints[10];
+int destinationPoints[10][DEST_FIELDS];
 int numDestinationPoints = 0;
 
 // ----------------------------------------------------------------------------
@@ -83,8 +84,8 @@ void initializeSimulationState() {
     numSpawnPoints = 0;
     numDestinationPoints = 0;
     for (int i = 0; i < 10; i++) {
-        spawnPoints[i].active = false;
-        destinationPoints[i].active = false;
+        spawnPoints[i][SPAWN_ACTIVE] = 0;
+        destinationPoints[i][DEST_ACTIVE] = 0;
     }
     
     // Reset simulation parameters
