@@ -77,14 +77,14 @@ void printGrid() {
             // Check if there's a train here
             bool hasActiveTrain = false;
             for (int i = 0; i < numTrains; i++) {
-                if (trains[i].state == TRAIN_ACTIVE && trains[i].x == row && trains[i].y == col) {
+                if (trains[i][TRAIN_STATE] == TRAIN_ACTIVE && trains[i][TRAIN_X] == row && trains[i][TRAIN_Y] == col) {
                     // Show train with arrows
-                    switch (trains[i].direction) {
+                    switch (trains[i][TRAIN_DIRECTION]) {
                         case DIR_UP:    std::cout << "^"; break;
                         case DIR_DOWN:  std::cout << "v"; break;
                         case DIR_LEFT:  std::cout << "<"; break;
                         case DIR_RIGHT: std::cout << ">"; break;
-                        default:        std::cout << trains[i].id; break;
+                        default:        std::cout << trains[i][TRAIN_ID]; break;
                     }
                     hasActiveTrain = true;
                     break;
@@ -103,9 +103,9 @@ void printGrid() {
     std::cout << "\nActive Trains: ";
     bool hasActive = false;
     for (int i = 0; i < numTrains; i++) {
-        if (trains[i].state == TRAIN_ACTIVE) {
+        if (trains[i][TRAIN_STATE] == TRAIN_ACTIVE) {
             if (hasActive) std::cout << ", ";
-            std::cout << "T" << trains[i].id << "(" << trains[i].x << "," << trains[i].y << ")";
+            std::cout << "T" << trains[i][TRAIN_ID] << "(" << trains[i][TRAIN_X] << "," << trains[i][TRAIN_Y] << ")";
             hasActive = true;
         }
     }
