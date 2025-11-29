@@ -37,16 +37,20 @@ enum TrainState {
     TRAIN_CRASHED
 };
 
-struct Train {
-    int id;
-    int spawnTick;
-    int x, y;
-    int direction;
-    int colorIndex;
-    int destinationX, destinationY;
-    TrainState state;
-    int waitTicks; // for safety buffer delays
-};
+// Train data represented as parallel arrays
+// Index mapping: 0=id, 1=spawnTick, 2=x, 3=y, 4=direction, 5=colorIndex, 
+//                6=destinationX, 7=destinationY, 8=state, 9=waitTicks
+const int TRAIN_ID = 0;
+const int TRAIN_SPAWN_TICK = 1;
+const int TRAIN_X = 2;
+const int TRAIN_Y = 3;
+const int TRAIN_DIRECTION = 4;
+const int TRAIN_COLOR_INDEX = 5;
+const int TRAIN_DEST_X = 6;
+const int TRAIN_DEST_Y = 7;
+const int TRAIN_STATE = 8;
+const int TRAIN_WAIT_TICKS = 9;
+const int TRAIN_FIELDS = 10;
 
 // ----------------------------------------------------------------------------
 // SWITCH CONSTANTS
@@ -58,18 +62,30 @@ enum SwitchMode {
     GLOBAL
 };
 
-struct Switch {
-    char letter;
-    SwitchMode mode;
-    int initState;
-    int kValues[4]; // K-values for UP, RIGHT, DOWN, LEFT
-    int counters[4]; // counters for each direction
-    int globalCounter;
-    std::string states[2]; // state names (e.g., "STRAIGHT", "TURN")
-    int currentState; // 0 or 1
-    bool flipQueued;
-    int x, y; // position on grid
-};
+// Switch data represented as parallel arrays
+// Index mapping: 0=letter, 1=mode, 2=initState, 3-6=kValues[4], 7-10=counters[4],
+//                11=globalCounter, 12=state0_hash, 13=state1_hash, 14=currentState, 
+//                15=flipQueued, 16=x, 17=y
+const int SWITCH_LETTER = 0;
+const int SWITCH_MODE = 1;
+const int SWITCH_INIT_STATE = 2;
+const int SWITCH_K0 = 3;
+const int SWITCH_K1 = 4;
+const int SWITCH_K2 = 5;
+const int SWITCH_K3 = 6;
+const int SWITCH_COUNTER0 = 7;
+const int SWITCH_COUNTER1 = 8;
+const int SWITCH_COUNTER2 = 9;
+const int SWITCH_COUNTER3 = 10;
+const int SWITCH_GLOBAL_COUNTER = 11;
+const int SWITCH_CURRENT_STATE = 12;
+const int SWITCH_FLIP_QUEUED = 13;
+const int SWITCH_X = 14;
+const int SWITCH_Y = 15;
+const int SWITCH_FIELDS = 16;
+
+// Helper arrays for switch state names (separate from int arrays)
+extern std::string switchStateNames[MAX_SWITCHES][2];
 
 // ----------------------------------------------------------------------------
 // WEATHER CONSTANTS
@@ -99,34 +115,38 @@ extern int gridRows, gridCols;
 // ----------------------------------------------------------------------------
 // GLOBAL STATE: TRAINS
 // ----------------------------------------------------------------------------
-extern Train trains[MAX_TRAINS];
+extern int trains[MAX_TRAINS][TRAIN_FIELDS];
 extern int numTrains;
 extern int activeTrains;
 
 // ----------------------------------------------------------------------------
 // GLOBAL STATE: SWITCHES (A-Z mapped to 0-25)
 // ----------------------------------------------------------------------------
-extern Switch switches[MAX_SWITCHES];
+extern int switches[MAX_SWITCHES][SWITCH_FIELDS];
 extern int numSwitches;
 
 // ----------------------------------------------------------------------------
 // GLOBAL STATE: SPAWN POINTS
 // ----------------------------------------------------------------------------
-struct SpawnPoint {
-    int x, y;
-    bool active;
-};
-extern SpawnPoint spawnPoints[10];
+// SpawnPoint data: 0=x, 1=y, 2=active
+const int SPAWN_X = 0;
+const int SPAWN_Y = 1;
+const int SPAWN_ACTIVE = 2;
+const int SPAWN_FIELDS = 3;
+
+extern int spawnPoints[10][SPAWN_FIELDS];
 extern int numSpawnPoints;
 
 // ----------------------------------------------------------------------------
 // GLOBAL STATE: DESTINATION POINTS
 // ----------------------------------------------------------------------------
-struct DestinationPoint {
-    int x, y;
-    bool active;
-};
-extern DestinationPoint destinationPoints[10];
+// DestinationPoint data: 0=x, 1=y, 2=active
+const int DEST_X = 0;
+const int DEST_Y = 1;
+const int DEST_ACTIVE = 2;
+const int DEST_FIELDS = 3;
+
+extern int destinationPoints[10][DEST_FIELDS];
 extern int numDestinationPoints;
 
 // ----------------------------------------------------------------------------
