@@ -12,6 +12,7 @@ bool isInBounds(int x, int y);
 
 // Check if a tile is a track (can trains move on it?)
 bool isTrackTile(int x, int y);
+bool isValidMove(int x, int y, int dir);
 
 // Check if a tile is a switch (A-Z)
 bool isSwitchTile(int x, int y);
