@@ -15,21 +15,21 @@
 void updateSwitchCounters() {
     // Check all trains to see if they entered switches this tick
     for (int i = 0; i < numTrains; i++) {
-        if (trains[i].state == TRAIN_ACTIVE) {
-            int x = trains[i].x;
-            int y = trains[i].y;
+        if (trains[i][TRAIN_STATE] == TRAIN_ACTIVE) {
+            int x = trains[i][TRAIN_X];
+            int y = trains[i][TRAIN_Y];
             
             if (isSwitchTile(x, y)) {
                 int switchIndex = getSwitchIndex(grid[x][y]);
                 if (switchIndex >= 0 && switchIndex < numSwitches) {
                     // Increment counter based on switch mode
-                    if (switches[switchIndex].mode == PER_DIR) {
+                    if (switches[switchIndex][SWITCH_MODE] == PER_DIR) {
                         // Increment counter for the direction the train came FROM
-                        int entryDir = trains[i].direction;
-                        switches[switchIndex].counters[entryDir]++;
+                        int entryDir = trains[i][TRAIN_DIRECTION];
+                        switches[switchIndex][SWITCH_COUNTER0 + entryDir]++;
                     } else {
                         // GLOBAL mode - increment global counter
-                        switches[switchIndex].globalCounter++;
+                        switches[switchIndex][SWITCH_GLOBAL_COUNTER]++;
                     }
                 }
             }
@@ -46,24 +46,24 @@ void queueSwitchFlips() {
     for (int i = 0; i < numSwitches; i++) {
         bool shouldFlip = false;
         
-        if (switches[i].mode == PER_DIR) {
+        if (switches[i][SWITCH_MODE] == PER_DIR) {
             // Check if any direction counter reached its K-value
             for (int dir = 0; dir < 4; dir++) {
-                if (switches[i].counters[dir] >= switches[i].kValues[dir]) {
+                if (switches[i][SWITCH_COUNTER0 + dir] >= switches[i][SWITCH_K0 + dir]) {
                     shouldFlip = true;
-                    switches[i].counters[dir] = 0; // Reset counter
+                    switches[i][SWITCH_COUNTER0 + dir] = 0; // Reset counter
                 }
             }
         } else {
             // GLOBAL mode - check global counter against first K-value
-            if (switches[i].globalCounter >= switches[i].kValues[0]) {
+            if (switches[i][SWITCH_GLOBAL_COUNTER] >= switches[i][SWITCH_K0]) {
                 shouldFlip = true;
-                switches[i].globalCounter = 0; // Reset counter
+                switches[i][SWITCH_GLOBAL_COUNTER] = 0; // Reset counter
             }
         }
         
         if (shouldFlip) {
-            switches[i].flipQueued = true;
+            switches[i][SWITCH_FLIP_QUEUED] = 1;
         }
     }
 }
@@ -75,10 +75,10 @@ void queueSwitchFlips() {
 // ----------------------------------------------------------------------------
 void applyDeferredFlips() {
     for (int i = 0; i < numSwitches; i++) {
-        if (switches[i].flipQueued) {
+        if (switches[i][SWITCH_FLIP_QUEUED]) {
             // Flip the switch state
-            switches[i].currentState = 1 - switches[i].currentState;
-            switches[i].flipQueued = false;
+            switches[i][SWITCH_CURRENT_STATE] = 1 - switches[i][SWITCH_CURRENT_STATE];
+            switches[i][SWITCH_FLIP_QUEUED] = 0;
             switchFlips++;
             
             // Log the switch flip
@@ -94,8 +94,8 @@ void applyDeferredFlips() {
 // ----------------------------------------------------------------------------
 void updateSignalLights() {
     for (int i = 0; i < numSwitches; i++) {
-        int x = switches[i].x;
-        int y = switches[i].y;
+        int x = switches[i][SWITCH_X];
+        int y = switches[i][SWITCH_Y];
         
         if (!isInBounds(x, y)) continue;
         
@@ -113,8 +113,8 @@ void updateSignalLights() {
             if (isInBounds(nextX, nextY)) {
                 // Check for trains within 2 tiles
                 for (int j = 0; j < numTrains; j++) {
-                    if (trains[j].state == TRAIN_ACTIVE) {
-                        int distance = abs(trains[j].x - nextX) + abs(trains[j].y - nextY);
+                    if (trains[j][TRAIN_STATE] == TRAIN_ACTIVE) {
+                        int distance = abs(trains[j][TRAIN_X] - nextX) + abs(trains[j][TRAIN_Y] - nextY);
                         
                         if (distance == 0) {
                             hasConflict = true; // Train directly on next tile
@@ -147,7 +147,7 @@ void updateSignalLights() {
 // ----------------------------------------------------------------------------
 void toggleSwitchState(int switchIndex) {
     if (switchIndex >= 0 && switchIndex < numSwitches) {
-        switches[switchIndex].currentState = 1 - switches[switchIndex].currentState;
+        switches[switchIndex][SWITCH_CURRENT_STATE] = 1 - switches[switchIndex][SWITCH_CURRENT_STATE];
         switchFlips++;
         logSwitchState(switchIndex);
     }
@@ -163,5 +163,5 @@ int getSwitchStateForDirection(int switchIndex, int direction) {
     
     // For now, all directions use the same switch state
     // Could be extended for more complex switch logic
-    return switches[switchIndex].currentState;
+    return switches[switchIndex][SWITCH_CURRENT_STATE];
 }
