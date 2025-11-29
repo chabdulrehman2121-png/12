@@ -12,12 +12,14 @@
 // ============================================================================
 
 // Storage for planned moves (for collisions).
-struct PlannedMove {
-    int trainIndex;
-    int nextX, nextY;
-    int distance; // to destination
-};
-PlannedMove plannedMoves[MAX_TRAINS];
+// PlannedMove array: 0=trainIndex, 1=nextX, 2=nextY, 3=distance
+const int PLANNED_TRAIN_IDX = 0;
+const int PLANNED_NEXT_X = 1;
+const int PLANNED_NEXT_Y = 2;
+const int PLANNED_DISTANCE = 3;
+const int PLANNED_FIELDS = 4;
+
+int plannedMoves[MAX_TRAINS][PLANNED_FIELDS];
 int numPlannedMoves = 0;
 
 // Previous positions (to detect switch entry).
@@ -30,15 +32,15 @@ int prevX[MAX_TRAINS], prevY[MAX_TRAINS];
 // ----------------------------------------------------------------------------
 void spawnTrainsForTick() {
     for (int i = 0; i < numTrains; i++) {
-        if (trains[i].state == TRAIN_SCHEDULED && trains[i].spawnTick == currentTick) {
-            trains[i].state = TRAIN_ACTIVE;
+        if (trains[i][TRAIN_STATE] == TRAIN_SCHEDULED && trains[i][TRAIN_SPAWN_TICK] == currentTick) {
+            trains[i][TRAIN_STATE] = TRAIN_ACTIVE;
             activeTrains++;
             
             // Store previous position
-            prevX[i] = trains[i].x;
-            prevY[i] = trains[i].y;
+            prevX[i] = trains[i][TRAIN_X];
+            prevY[i] = trains[i][TRAIN_Y];
             
-            logTrainTrace(trains[i].id, trains[i].x, trains[i].y, trains[i].direction, "SPAWNED");
+            logTrainTrace(trains[i][TRAIN_ID], trains[i][TRAIN_X], trains[i][TRAIN_Y], trains[i][TRAIN_DIRECTION], "SPAWNED");
         }
     }
 }
@@ -49,35 +51,33 @@ void spawnTrainsForTick() {
 // Compute next position/direction from current tile and rules.
 // ----------------------------------------------------------------------------
 bool determineNextPosition(int trainIndex) {
-    Train& train = trains[trainIndex];
-    
     // Store current position as previous
-    prevX[trainIndex] = train.x;
-    prevY[trainIndex] = train.y;
+    prevX[trainIndex] = trains[trainIndex][TRAIN_X];
+    prevY[trainIndex] = trains[trainIndex][TRAIN_Y];
     
     // Calculate next position based on current direction
-    int nextX = train.x + dx[train.direction];
-    int nextY = train.y + dy[train.direction];
+    int nextX = trains[trainIndex][TRAIN_X] + dx[trains[trainIndex][TRAIN_DIRECTION]];
+    int nextY = trains[trainIndex][TRAIN_Y] + dy[trains[trainIndex][TRAIN_DIRECTION]];
     
     // Check if next position is valid
     if (!isInBounds(nextX, nextY) || !isTrackTile(nextX, nextY)) {
         // Train would go off track - crash it
-        train.state = TRAIN_CRASHED;
+        trains[trainIndex][TRAIN_STATE] = TRAIN_CRASHED;
         trainsCrashed++;
         activeTrains--;
-        logTrainTrace(train.id, train.x, train.y, train.direction, "CRASHED");
+        logTrainTrace(trains[trainIndex][TRAIN_ID], trains[trainIndex][TRAIN_X], trains[trainIndex][TRAIN_Y], trains[trainIndex][TRAIN_DIRECTION], "CRASHED");
         return false;
     }
     
     // Calculate distance to destination for priority system
-    int distance = abs(nextX - train.destinationX) + abs(nextY - train.destinationY);
+    int distance = abs(nextX - trains[trainIndex][TRAIN_DEST_X]) + abs(nextY - trains[trainIndex][TRAIN_DEST_Y]);
     
     // Add to planned moves for collision detection
     if (numPlannedMoves < MAX_TRAINS) {
-        plannedMoves[numPlannedMoves].trainIndex = trainIndex;
-        plannedMoves[numPlannedMoves].nextX = nextX;
-        plannedMoves[numPlannedMoves].nextY = nextY;
-        plannedMoves[numPlannedMoves].distance = distance;
+        plannedMoves[numPlannedMoves][PLANNED_TRAIN_IDX] = trainIndex;
+        plannedMoves[numPlannedMoves][PLANNED_NEXT_X] = nextX;
+        plannedMoves[numPlannedMoves][PLANNED_NEXT_Y] = nextY;
+        plannedMoves[numPlannedMoves][PLANNED_DISTANCE] = distance;
         numPlannedMoves++;
     }
     
@@ -99,7 +99,7 @@ int getNextDirection(int x, int y, int currentDir, int trainIndex) {
         int switchIndex = getSwitchIndex(tile);
         if (switchIndex >= 0) {
             // Determine exit direction based on switch state
-            if (switches[switchIndex].currentState == 0) {
+            if (switches[switchIndex][SWITCH_CURRENT_STATE] == 0) {
                 // STRAIGHT state - maintain direction
                 return currentDir;
             } else {
@@ -146,8 +146,6 @@ int getNextDirection(int x, int y, int currentDir, int trainIndex) {
 // Choose best direction at '+' toward destination.
 // ----------------------------------------------------------------------------
 int getSmartDirectionAtCrossing(int x, int y, int currentDir, int trainIndex) {
-    Train& train = trains[trainIndex];
-    
     // Simple approach for easy level: find the direction that gets closest to destination
     int bestDirection = currentDir;
     int bestDistance = 999;
@@ -158,7 +156,7 @@ int getSmartDirectionAtCrossing(int x, int y, int currentDir, int trainIndex) {
         
         // Check if this direction is valid
         if (isInBounds(nextX, nextY) && isTrackTile(nextX, nextY)) {
-            int distance = abs(nextX - train.destinationX) + abs(nextY - train.destinationY);
+            int distance = abs(nextX - trains[trainIndex][TRAIN_DEST_X]) + abs(nextY - trains[trainIndex][TRAIN_DEST_Y]);
             if (distance < bestDistance) {
                 bestDistance = distance;
                 bestDirection = dir;
@@ -178,7 +176,7 @@ void determineAllRoutes() {
     numPlannedMoves = 0;  // Clear planned moves
     
     for (int i = 0; i < numTrains; i++) {
-        if (trains[i].state == TRAIN_ACTIVE) {
+        if (trains[i][TRAIN_STATE] == TRAIN_ACTIVE) {
             determineNextPosition(i);
         }
     }
@@ -195,12 +193,14 @@ void moveAllTrains() {
     
     // Then move all non-crashed trains
     for (int moveIndex = 0; moveIndex < numPlannedMoves; moveIndex++) {
-        PlannedMove& move = plannedMoves[moveIndex];
-        int i = move.trainIndex;
-        if (trains[i].state == TRAIN_ACTIVE) {
+        int i = plannedMoves[moveIndex][PLANNED_TRAIN_IDX];
+        int nextX = plannedMoves[moveIndex][PLANNED_NEXT_X];
+        int nextY = plannedMoves[moveIndex][PLANNED_NEXT_Y];
+        
+        if (trains[i][TRAIN_STATE] == TRAIN_ACTIVE) {
             // Check for safety tiles that cause delays
-            if (safetyTiles[trains[i].x][trains[i].y]) {
-                trains[i].waitTicks++;
+            if (safetyTiles[trains[i][TRAIN_X]][trains[i][TRAIN_Y]]) {
+                trains[i][TRAIN_WAIT_TICKS]++;
                 totalWaitTicks++;
                 
                 // Apply weather effects
@@ -208,23 +208,23 @@ void moveAllTrains() {
                 if (weather == WEATHER_RAIN) delayTicks = 2;
                 if (weather == WEATHER_FOG) delayTicks = 3;
                 
-                if (trains[i].waitTicks >= delayTicks) {
-                    trains[i].waitTicks = 0; // Reset wait counter
+                if (trains[i][TRAIN_WAIT_TICKS] >= delayTicks) {
+                    trains[i][TRAIN_WAIT_TICKS] = 0; // Reset wait counter
                     
                     // Move the train
-                    trains[i].x = move.nextX;
-                    trains[i].y = move.nextY;
-                    trains[i].direction = getNextDirection(move.nextX, move.nextY, trains[i].direction, i);
+                    trains[i][TRAIN_X] = nextX;
+                    trains[i][TRAIN_Y] = nextY;
+                    trains[i][TRAIN_DIRECTION] = getNextDirection(nextX, nextY, trains[i][TRAIN_DIRECTION], i);
                     
-                    logTrainTrace(trains[i].id, trains[i].x, trains[i].y, trains[i].direction, "MOVING");
+                    logTrainTrace(trains[i][TRAIN_ID], trains[i][TRAIN_X], trains[i][TRAIN_Y], trains[i][TRAIN_DIRECTION], "MOVING");
                 }
             } else {
                 // Move the train normally
-                trains[i].x = move.nextX;
-                trains[i].y = move.nextY;
-                trains[i].direction = getNextDirection(move.nextX, move.nextY, trains[i].direction, i);
+                trains[i][TRAIN_X] = nextX;
+                trains[i][TRAIN_Y] = nextY;
+                trains[i][TRAIN_DIRECTION] = getNextDirection(nextX, nextY, trains[i][TRAIN_DIRECTION], i);
                 
-                logTrainTrace(trains[i].id, trains[i].x, trains[i].y, trains[i].direction, "MOVING");
+                logTrainTrace(trains[i][TRAIN_ID], trains[i][TRAIN_X], trains[i][TRAIN_Y], trains[i][TRAIN_DIRECTION], "MOVING");
             }
         }
     }
@@ -239,11 +239,13 @@ void detectCollisions() {
     // Simple bubble sort by distance (higher distance = higher priority) 
     for (int i = 0; i < numPlannedMoves - 1; i++) {
         for (int j = 0; j < numPlannedMoves - i - 1; j++) {
-            if (plannedMoves[j].distance < plannedMoves[j + 1].distance) {
+            if (plannedMoves[j][PLANNED_DISTANCE] < plannedMoves[j + 1][PLANNED_DISTANCE]) {
                 // Swap
-                PlannedMove temp = plannedMoves[j];
-                plannedMoves[j] = plannedMoves[j + 1];
-                plannedMoves[j + 1] = temp;
+                for (int k = 0; k < PLANNED_FIELDS; k++) {
+                    int temp = plannedMoves[j][k];
+                    plannedMoves[j][k] = plannedMoves[j + 1][k];
+                    plannedMoves[j + 1][k] = temp;
+                }
             }
         }
     }
@@ -252,29 +254,32 @@ void detectCollisions() {
     for (int i = 0; i < numPlannedMoves; i++) {
         for (int j = i + 1; j < numPlannedMoves; j++) {
             // Same destination collision
-            if (plannedMoves[i].nextX == plannedMoves[j].nextX && 
-                plannedMoves[i].nextY == plannedMoves[j].nextY) {
+            if (plannedMoves[i][PLANNED_NEXT_X] == plannedMoves[j][PLANNED_NEXT_X] && 
+                plannedMoves[i][PLANNED_NEXT_Y] == plannedMoves[j][PLANNED_NEXT_Y]) {
+                
+                int trainI = plannedMoves[i][PLANNED_TRAIN_IDX];
+                int trainJ = plannedMoves[j][PLANNED_TRAIN_IDX];
                 
                 // Higher distance train (i) gets priority, lower distance train (j) waits
-                if (plannedMoves[i].distance > plannedMoves[j].distance) {
-                    trains[plannedMoves[j].trainIndex].waitTicks++;
-                } else if (plannedMoves[j].distance > plannedMoves[i].distance) {
-                    trains[plannedMoves[i].trainIndex].waitTicks++;
+                if (plannedMoves[i][PLANNED_DISTANCE] > plannedMoves[j][PLANNED_DISTANCE]) {
+                    trains[trainJ][TRAIN_WAIT_TICKS]++;
+                } else if (plannedMoves[j][PLANNED_DISTANCE] > plannedMoves[i][PLANNED_DISTANCE]) {
+                    trains[trainI][TRAIN_WAIT_TICKS]++;
                 } else {
                     // Equal distance - both crash
-                    trains[plannedMoves[i].trainIndex].state = TRAIN_CRASHED;
-                    trains[plannedMoves[j].trainIndex].state = TRAIN_CRASHED;
+                    trains[trainI][TRAIN_STATE] = TRAIN_CRASHED;
+                    trains[trainJ][TRAIN_STATE] = TRAIN_CRASHED;
                     trainsCrashed += 2;
                     activeTrains -= 2;
                     
-                    logTrainTrace(trains[plannedMoves[i].trainIndex].id, 
-                                trains[plannedMoves[i].trainIndex].x, 
-                                trains[plannedMoves[i].trainIndex].y, 
-                                trains[plannedMoves[i].trainIndex].direction, "CRASHED");
-                    logTrainTrace(trains[plannedMoves[j].trainIndex].id, 
-                                trains[plannedMoves[j].trainIndex].x, 
-                                trains[plannedMoves[j].trainIndex].y, 
-                                trains[plannedMoves[j].trainIndex].direction, "CRASHED");
+                    logTrainTrace(trains[trainI][TRAIN_ID], 
+                                trains[trainI][TRAIN_X], 
+                                trains[trainI][TRAIN_Y], 
+                                trains[trainI][TRAIN_DIRECTION], "CRASHED");
+                    logTrainTrace(trains[trainJ][TRAIN_ID], 
+                                trains[trainJ][TRAIN_X], 
+                                trains[trainJ][TRAIN_Y], 
+                                trains[trainJ][TRAIN_DIRECTION], "CRASHED");
                 }
             }
         }
@@ -288,13 +293,13 @@ void detectCollisions() {
 // ----------------------------------------------------------------------------
 void checkArrivals() {
     for (int i = 0; i < numTrains; i++) {
-        if (trains[i].state == TRAIN_ACTIVE) {
-            if (trains[i].x == trains[i].destinationX && trains[i].y == trains[i].destinationY) {
-                trains[i].state = TRAIN_DELIVERED;
+        if (trains[i][TRAIN_STATE] == TRAIN_ACTIVE) {
+            if (trains[i][TRAIN_X] == trains[i][TRAIN_DEST_X] && trains[i][TRAIN_Y] == trains[i][TRAIN_DEST_Y]) {
+                trains[i][TRAIN_STATE] = TRAIN_DELIVERED;
                 trainsDelivered++;
                 activeTrains--;
                 
-                logTrainTrace(trains[i].id, trains[i].x, trains[i].y, trains[i].direction, "DELIVERED");
+                logTrainTrace(trains[i][TRAIN_ID], trains[i][TRAIN_X], trains[i][TRAIN_Y], trains[i][TRAIN_DIRECTION], "DELIVERED");
             }
         }
     }
@@ -309,10 +314,10 @@ void applyEmergencyHalt() {
     if (!emergencyHaltActive) return;
     
     for (int i = 0; i < numTrains; i++) {
-        if (trains[i].state == TRAIN_ACTIVE) {
-            int distance = abs(trains[i].x - emergencyHaltX) + abs(trains[i].y - emergencyHaltY);
+        if (trains[i][TRAIN_STATE] == TRAIN_ACTIVE) {
+            int distance = abs(trains[i][TRAIN_X] - emergencyHaltX) + abs(trains[i][TRAIN_Y] - emergencyHaltY);
             if (distance <= emergencyHaltRange) {
-                trains[i].waitTicks += 3; // Halt for 3 ticks
+                trains[i][TRAIN_WAIT_TICKS] += 3; // Halt for 3 ticks
                 totalWaitTicks += 3;
             }
         }
