@@ -79,21 +79,21 @@ bool loadLevelFile(const std::string& filename) {
                     
                     // Record spawn and destination points
                     if (line[col] == 'S' && numSpawnPoints < 10) {
-                        spawnPoints[numSpawnPoints].x = mapRowIndex;
-                        spawnPoints[numSpawnPoints].y = col;
-                        spawnPoints[numSpawnPoints].active = true;
+                        spawnPoints[numSpawnPoints][SPAWN_X] = mapRowIndex;
+                        spawnPoints[numSpawnPoints][SPAWN_Y] = col;
+                        spawnPoints[numSpawnPoints][SPAWN_ACTIVE] = 1;
                         numSpawnPoints++;
                     } else if (line[col] == 'D' && numDestinationPoints < 10) {
-                        destinationPoints[numDestinationPoints].x = mapRowIndex;
-                        destinationPoints[numDestinationPoints].y = col;
-                        destinationPoints[numDestinationPoints].active = true;
+                        destinationPoints[numDestinationPoints][DEST_X] = mapRowIndex;
+                        destinationPoints[numDestinationPoints][DEST_Y] = col;
+                        destinationPoints[numDestinationPoints][DEST_ACTIVE] = 1;
                         numDestinationPoints++;
                     } else if (line[col] >= 'A' && line[col] <= 'Z' && line[col] != 'S' && line[col] != 'D') {
                         // Record switch positions
                         int switchIndex = line[col] - 'A';
-                        switches[switchIndex].x = mapRowIndex;
-                        switches[switchIndex].y = col;
-                        switches[switchIndex].letter = line[col];
+                        switches[switchIndex][SWITCH_X] = mapRowIndex;
+                        switches[switchIndex][SWITCH_Y] = col;
+                        switches[switchIndex][SWITCH_LETTER] = line[col];
                     }
                 }
                 mapRowIndex++;
@@ -108,16 +108,16 @@ bool loadLevelFile(const std::string& filename) {
             iss >> letter >> modeStr >> initState >> k0 >> k1 >> k2 >> k3 >> state0 >> state1;
             
             int switchIndex = letter - 'A';
-            switches[switchIndex].letter = letter;
-            switches[switchIndex].mode = (modeStr == "PER_DIR") ? PER_DIR : GLOBAL;
-            switches[switchIndex].initState = initState;
-            switches[switchIndex].currentState = initState;
-            switches[switchIndex].kValues[0] = k0; // UP
-            switches[switchIndex].kValues[1] = k1; // RIGHT
-            switches[switchIndex].kValues[2] = k2; // DOWN
-            switches[switchIndex].kValues[3] = k3; // LEFT
-            switches[switchIndex].states[0] = state0;
-            switches[switchIndex].states[1] = state1;
+            switches[switchIndex][SWITCH_LETTER] = letter;
+            switches[switchIndex][SWITCH_MODE] = (modeStr == "PER_DIR") ? PER_DIR : GLOBAL;
+            switches[switchIndex][SWITCH_INIT_STATE] = initState;
+            switches[switchIndex][SWITCH_CURRENT_STATE] = initState;
+            switches[switchIndex][SWITCH_K0] = k0; // UP
+            switches[switchIndex][SWITCH_K1] = k1; // RIGHT
+            switches[switchIndex][SWITCH_K2] = k2; // DOWN
+            switches[switchIndex][SWITCH_K3] = k3; // LEFT
+            switchStateNames[switchIndex][0] = state0;
+            switchStateNames[switchIndex][1] = state1;
             
             numSwitches = std::max(numSwitches, switchIndex + 1);
         } else if (section == "TRAINS") {
@@ -125,20 +125,20 @@ bool loadLevelFile(const std::string& filename) {
             int spawnTick, x, y, direction, colorIndex;
             iss >> spawnTick >> x >> y >> direction >> colorIndex;
             
-            trains[numTrains].id = numTrains;
-            trains[numTrains].spawnTick = spawnTick;
-            trains[numTrains].x = x;
-            trains[numTrains].y = y;
-            trains[numTrains].direction = direction;
-            trains[numTrains].colorIndex = colorIndex;
-            trains[numTrains].state = TRAIN_SCHEDULED;
-            trains[numTrains].waitTicks = 0;
+            trains[numTrains][TRAIN_ID] = numTrains;
+            trains[numTrains][TRAIN_SPAWN_TICK] = spawnTick;
+            trains[numTrains][TRAIN_X] = x;
+            trains[numTrains][TRAIN_Y] = y;
+            trains[numTrains][TRAIN_DIRECTION] = direction;
+            trains[numTrains][TRAIN_COLOR_INDEX] = colorIndex;
+            trains[numTrains][TRAIN_STATE] = TRAIN_SCHEDULED;
+            trains[numTrains][TRAIN_WAIT_TICKS] = 0;
             
             // Set destination to first available destination point for now
             if (numDestinationPoints > 0) {
                 int destIndex = colorIndex % numDestinationPoints;
-                trains[numTrains].destinationX = destinationPoints[destIndex].x;
-                trains[numTrains].destinationY = destinationPoints[destIndex].y;
+                trains[numTrains][TRAIN_DEST_X] = destinationPoints[destIndex][DEST_X];
+                trains[numTrains][TRAIN_DEST_Y] = destinationPoints[destIndex][DEST_Y];
             }
             
             numTrains++;
@@ -188,9 +188,9 @@ void logTrainTrace(int trainID, int x, int y, int direction, const std::string& 
 // ----------------------------------------------------------------------------
 void logSwitchState(int switchIndex) {
     std::ofstream switches_log("out/switches.csv", std::ios::app);
-    switches_log << currentTick << "," << switches[switchIndex].letter << "," 
-                 << (switches[switchIndex].mode == PER_DIR ? "PER_DIR" : "GLOBAL") << ","
-                 << switches[switchIndex].states[switches[switchIndex].currentState] << "\n";
+    switches_log << currentTick << "," << (char)switches[switchIndex][SWITCH_LETTER] << "," 
+                 << (switches[switchIndex][SWITCH_MODE] == PER_DIR ? "PER_DIR" : "GLOBAL") << ","
+                 << switchStateNames[switchIndex][switches[switchIndex][SWITCH_CURRENT_STATE]] << "\n";
     switches_log.close();
 }
 
@@ -201,7 +201,7 @@ void logSwitchState(int switchIndex) {
 // ----------------------------------------------------------------------------
 void logSignalState(int switchIndex, const std::string& color) {
     std::ofstream signals_log("out/signals.csv", std::ios::app);
-    signals_log << currentTick << "," << switches[switchIndex].letter << "," << color << "\n";
+    signals_log << currentTick << "," << (char)switches[switchIndex][SWITCH_LETTER] << "," << color << "\n";
     signals_log.close();
 }
 
