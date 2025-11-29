@@ -78,7 +78,7 @@ bool isSimulationComplete() {
     int crashed = 0;
     
     for (int i = 0; i < numTrains; i++) {
-        switch (trains[i].state) {
+        switch (trains[i][TRAIN_STATE]) {
             case TRAIN_SCHEDULED: scheduledTrains++; break;
             case TRAIN_ACTIVE: actualActive++; break;
             case TRAIN_DELIVERED: delivered++; break;
